@@ -33,8 +33,11 @@ mboot:
 
 [GLOBAL start]                  ; Kernel entry point.
 [EXTERN start_kernel]           ; This is the entry point of our C code
+[EXTERN clear]			; External function declared in vga.c
 
 start:
+    call clear			; Initialise the screen (by clearing it)
+    
     ; Load multiboot information:
     push esp
     push ebx
