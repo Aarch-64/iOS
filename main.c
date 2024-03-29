@@ -14,7 +14,7 @@
 extern u32int placement_address;
 u32int initial_esp;
 
-int main(struct multiboot *mboot_ptr, u32int initial_stack)
+void start_kernel(struct multiboot *mboot_ptr, u32int initial_stack)
 {
     initial_esp = initial_stack;
     // Initialise all the ISRs and segmentation
@@ -58,6 +58,4 @@ int main(struct multiboot *mboot_ptr, u32int initial_stack)
     switch_to_user_mode();
 
     syscall_print("Hello, user world!\n");
-
-    return 0;
 }
