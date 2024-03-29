@@ -8,12 +8,14 @@
 
 #include "common.h"
 #include "ordered_array.h"
+#include "paging.h"
 
-#define KHEAP_START         0xC0000000
+#define KHEAP_START         0x50000000
 #define KHEAP_INITIAL_SIZE  0x100000
+#define KHEAP_MAX_ADDRESS 0xFFFF000
 
 #define HEAP_INDEX_SIZE   0x20000
-#define HEAP_MAGIC        0x123890AB
+#define HEAP_MAGIC        0xDEADBEEF
 #define HEAP_MIN_SIZE     0x70000
 
 /**
@@ -52,6 +54,9 @@ heap_t *create_heap(u32int start, u32int end, u32int max, u8int supervisor, u8in
    on a page boundary.
 **/
 void *alloc(u32int size, u8int page_align, heap_t *heap);
+
+//With physical address
+void alloc_frame_p(page_t *page, int is_kernel, int is_writeable, u32int phys);
 
 /**
    Releases a block allocated with 'alloc'.
@@ -96,5 +101,16 @@ u32int kmalloc(u32int sz);
    General deallocation function.
 **/
 void kfree(void *p);
+
+/**
+   Return amount of memory used
+**/
+u32int get_memory_usage();
+
+/**
+   Expand and contract heap
+**/
+void expand(u32int new_size, heap_t *heap);
+u32int contract(u32int new_size, heap_t *heap);
 
 #endif // KHEAP_H

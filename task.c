@@ -5,6 +5,8 @@
 
 #include "task.h"
 #include "paging.h"
+#include "descriptor_tables.h"
+#include "kheap.h"
 
 // The currently running task.
 volatile task_t *current_task;

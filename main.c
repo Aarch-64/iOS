@@ -1,7 +1,7 @@
 // main.c -- Defines the C-code kernel entry point, calls initialisation routines.
 //           Made for JamesM's tutorials <www.jamesmolloy.co.uk>
 
-#include "monitor.h"
+#include "vga.h"
 #include "descriptor_tables.h"
 #include "timer.h"
 #include "paging.h"
@@ -20,7 +20,7 @@ int main(struct multiboot *mboot_ptr, u32int initial_stack)
     // Initialise all the ISRs and segmentation
     init_descriptor_tables();
     // Initialise the screen (by clearing it)
-    monitor_clear();
+    clear();
 
     // Initialise the PIT to 100Hz
     asm volatile("sti");
@@ -33,20 +33,31 @@ int main(struct multiboot *mboot_ptr, u32int initial_stack)
     // Don't trample our module with placement accesses, please!
     placement_address = initrd_end;
 
-    // Start paging.
-    initialise_paging();
+    //Initialise paging with the memory amount reported by GRUB
+    u32int memsz = ((mboot_ptr->mem_lower + mboot_ptr->mem_upper) * 1024); //Bytes
+    init_paging(memsz);
+    printk("Paging initialised with %dMB of memory...\n",(memsz/1024/1024));
 
+    u32int malloc_test = kmalloc(100);
+    if(malloc_test != 0)
+    {
+         printk("MMU working as expected:\n\tMemory test assigned 100 bytes at 0x%x...\n",malloc_test);
+         kfree((void*)malloc_test);
+    }
+    else
+    	printk("MMU failed test...\n");
+
+    fs_root = initialise_initrd(initrd_location);
+    printk("RAMFS initialised...\n");
+    
     // Start multitasking.
     initialise_tasking();
-
-    // Initialise the initial ramdisk, and set it as the filesystem root.
-    fs_root = initialise_initrd(initrd_location);
-
+    
     initialise_syscalls();
 
     switch_to_user_mode();
 
-    syscall_monitor_write("Hello, user world!\n");
+    syscall_print("Hello, user world!\n");
 
     return 0;
 }

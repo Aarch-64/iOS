@@ -12,6 +12,9 @@ u32int placement_address = (u32int)&end;
 extern page_directory_t *kernel_directory;
 heap_t *kheap=0;
 
+//Physical memory used
+volatile u32int phys_mem_usage;
+
 u32int kmalloc_int(u32int sz, int align, u32int *phys)
 {
     if (kheap != 0)
@@ -22,6 +25,7 @@ u32int kmalloc_int(u32int sz, int align, u32int *phys)
             page_t *page = get_page((u32int)addr, 0, kernel_directory);
             *phys = page->frame*0x1000 + ((u32int)addr&0xFFF);
         }
+        phys_mem_usage += sz;
         return (u32int)addr;
     }
     else
@@ -38,13 +42,19 @@ u32int kmalloc_int(u32int sz, int align, u32int *phys)
         }
         u32int tmp = placement_address;
         placement_address += sz;
+        phys_mem_usage += sz;
         return tmp;
     }
 }
 
 void kfree(void *p)
 {
-    free(p, kheap);
+     if(kheap != 0)
+     {
+         free(p, kheap);
+     } else {
+         return;
+     }
 }
 
 u32int kmalloc_a(u32int sz)
@@ -67,13 +77,14 @@ u32int kmalloc(u32int sz)
     return kmalloc_int(sz, 0, 0);
 }
 
-static void expand(u32int new_size, heap_t *heap)
+void expand(u32int new_size, heap_t *heap)
 {
+     
     // Sanity check.
     ASSERT(new_size > heap->end_address - heap->start_address);
 
     // Get the nearest following page boundary.
-    if (new_size&0xFFFFF000 != 0)
+    if ((new_size&0xFFFFF000) != 0)
     {
         new_size &= 0xFFFFF000;
         new_size += 0x1000;
@@ -95,7 +106,7 @@ static void expand(u32int new_size, heap_t *heap)
     heap->end_address = heap->start_address+new_size;
 }
 
-static u32int contract(u32int new_size, heap_t *heap)
+u32int contract(u32int new_size, heap_t *heap)
 {
     // Sanity check.
     ASSERT(new_size < heap->end_address-heap->start_address);
@@ -136,7 +147,7 @@ static s32int find_smallest_hole(u32int size, u8int page_align, heap_t *heap)
             // Page-align the starting point of this header.
             u32int location = (u32int)header;
             s32int offset = 0;
-            if ((location+sizeof(header_t)) & 0xFFFFF000 != 0)
+            if (((location+sizeof(header_t)) & 0xFFFFF000) != 0)
                 offset = 0x1000 /* page size */  - (location+sizeof(header_t))%0x1000;
             s32int hole_size = (s32int)header->size - offset;
             // Can we fit now?
@@ -174,7 +185,7 @@ heap_t *create_heap(u32int start, u32int end_addr, u32int max, u8int supervisor,
     start += sizeof(type_t)*HEAP_INDEX_SIZE;
 
     // Make sure the start address is page-aligned.
-    if (start & 0xFFFFF000 != 0)
+    if ((start & 0xFFFFF000) != 0)
     {
         start &= 0xFFFFF000;
         start += 0x1000;
@@ -206,17 +217,17 @@ void *alloc(u32int size, u8int page_align, heap_t *heap)
 
     if (iterator == -1) // If we didn't find a suitable hole
     {
-        // Save some previous data.
+        //some data we need
         u32int old_length = heap->end_address - heap->start_address;
         u32int old_end_address = heap->end_address;
 
-        // We need to allocate some more space.
+        //expand the heap
         expand(old_length+new_size, heap);
         u32int new_length = heap->end_address-heap->start_address;
 
-        // Find the endmost header. (Not endmost in size, but in location).
+        //we need to find the last header
         iterator = 0;
-        // Vars to hold the index of, and value of, the endmost header found so far.
+        //these hold the data for the last header so far
         u32int idx = -1; u32int value = 0x0;
         while (iterator < heap->index.size)
         {
@@ -229,7 +240,7 @@ void *alloc(u32int size, u8int page_align, heap_t *heap)
             iterator++;
         }
 
-        // If we didn't find ANY headers, we need to add one.
+        //we didnt find a header, add one
         if (idx == -1)
         {
             header_t *header = (header_t *)old_end_address;
@@ -328,10 +339,12 @@ void free(void *p, heap_t *heap)
     // Get the header and footer associated with this pointer.
     header_t *header = (header_t*) ( (u32int)p - sizeof(header_t) );
     footer_t *footer = (footer_t*) ( (u32int)header + header->size - sizeof(footer_t) );
+    
+    phys_mem_usage -= header->size;
 
     // Sanity checks.
-    ASSERT(header->magic == HEAP_MAGIC);
-    ASSERT(footer->magic == HEAP_MAGIC);
+    if(header->magic != HEAP_MAGIC || footer->magic != HEAP_MAGIC);
+         return;
 
     // Make us a hole.
     header->is_hole = 1;
@@ -405,4 +418,9 @@ void free(void *p, heap_t *heap)
     if (do_add == 1)
         insert_ordered_array((void*)header, &heap->index);
 
+}
+
+u32int get_memory_usage()
+{
+    return phys_mem_usage+(placement_address-0x1000); 
 }

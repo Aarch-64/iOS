@@ -4,21 +4,19 @@
 #include "syscall.h"
 #include "isr.h"
 
-#include "monitor.h"
+#include "vga.h"
 
 static void syscall_handler(registers_t *regs);
 
-DEFN_SYSCALL1(monitor_write, 0, const char*);
-DEFN_SYSCALL1(monitor_write_hex, 1, const char*);
-DEFN_SYSCALL1(monitor_write_dec, 2, const char*);
+DEFN_SYSCALL1(write, 0, const char*);
+DEFN_SYSCALL1(print, 1, const char*);
 
-static void *syscalls[3] =
+static void *syscalls[2] =
 {
-    &monitor_write,
-    &monitor_write_hex,
-    &monitor_write_dec,
+    &write,
+    &printk
 };
-u32int num_syscalls = 3;
+u32int num_syscalls = 2;
 
 void initialise_syscalls()
 {

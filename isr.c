@@ -6,7 +6,7 @@
 
 #include "common.h"
 #include "isr.h"
-#include "monitor.h"
+#include "vga.h"
 
 isr_t interrupt_handlers[256];
 
@@ -29,9 +29,7 @@ void isr_handler(registers_t regs)
     }
     else
     {
-        monitor_write("unhandled interrupt: ");
-        monitor_write_hex(int_no);
-        monitor_put('\n');
+        printk("unhandled interrupt: 0x%x\n", int_no);
         for(;;);
     }
 }
